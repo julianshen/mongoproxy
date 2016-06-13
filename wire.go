@@ -90,7 +90,7 @@ func readInt64s(r io.Reader, n int) ([]int64, error) {
 	return v, nil
 }
 
-func readDoc(r *bufio.Reader) (bson.M, int, error) {
+func readDoc(r *bufio.Reader) (bson.D, int, error) {
 	b, e := r.Peek(4)
 	if e != nil {
 		return nil, 0, e
@@ -106,7 +106,7 @@ func readDoc(r *bufio.Reader) (bson.M, int, error) {
 		return nil, 0, e
 	}
 
-	var out bson.M
+	var out bson.D
 	e = bson.Unmarshal(bDoc, &out)
 
 	if e != nil {
@@ -116,7 +116,7 @@ func readDoc(r *bufio.Reader) (bson.M, int, error) {
 	return out, int(n), nil
 }
 
-func writeBson(data bson.M, w *bufio.Writer) error {
+func writeBson(data bson.D, w *bufio.Writer) error {
 	if len(data) > 0 {
 		bytes, err := bson.Marshal(data)
 		if err != nil {
@@ -162,8 +162,8 @@ type Query struct {
 	NumberToSkip       int32  // number of documents to skip
 	NumberToReturn     int32  // number of documents to return
 	//  in the first OP_REPLY batch
-	Query                bson.M // query object.  See below for details.
-	ReturnFieldsSelector bson.M // Optional. Selector indicating the fields
+	Query                bson.D // query object.  See below for details.
+	ReturnFieldsSelector bson.D // Optional. Selector indicating the fields
 	//  to return.  See below for details.
 }
 
@@ -176,8 +176,8 @@ type Update struct {
 	ZERO               int32  // 0 - reserved for future use
 	FullCollectionName string // "dbname.collectionname"
 	Flags              int32  // bit vector. see below
-	Selector           bson.M // the query to select the document
-	Update             bson.M // specification of the update to perform
+	Selector           bson.D // the query to select the document
+	Update             bson.D // specification of the update to perform
 }
 
 func (req *Update) GetOp() Opcode {
@@ -188,7 +188,7 @@ type Insert struct {
 	*MsgHeader                  // standard message header
 	Flags              int32    // bit vector - see below
 	FullCollectionName string   // "dbname.collectionname"
-	Documents          []bson.M // one or more documents to insert into the collection
+	Documents          []bson.D // one or more documents to insert into the collection
 }
 
 func (req *Insert) GetOp() Opcode {
@@ -212,7 +212,7 @@ type Delete struct {
 	ZERO               int32  // 0 - reserved for future use
 	FullCollectionName string // "dbname.collectionname"
 	Flags              int32  // bit vector - see below for details.
-	Selector           bson.M // query object.  See below for details.
+	Selector           bson.D // query object.  See below for details.
 }
 
 func (req *Delete) GetOp() Opcode {
@@ -245,7 +245,7 @@ type Reply struct {
 	CursorID       int64    // cursor id if client needs to do get more's
 	StartingFrom   int32    // where in the cursor this reply is starting
 	NumberReturned int32    // number of documents in the reply
-	Documents      []bson.M // documents
+	Documents      []bson.D // documents
 }
 
 func (req *Reply) GetOp() Opcode {
@@ -304,7 +304,7 @@ func ReadRequest(r io.Reader) (RequestMsg, error) {
 		}
 
 		switch {
-		case t == reflect.TypeOf((bson.M)(nil)):
+		case t == reflect.TypeOf((bson.D)(nil)):
 			d, n, e := readDoc(bufferReader)
 			if e != nil {
 				return nil, e
@@ -313,8 +313,8 @@ func ReadRequest(r io.Reader) (RequestMsg, error) {
 			f.Set(reflect.ValueOf(d))
 			bytesRead += n
 
-		case t == reflect.TypeOf(([]bson.M)(nil)):
-			var data []bson.M
+		case t == reflect.TypeOf(([]bson.D)(nil)):
+			var data []bson.D
 			for {
 				d, n, e := readDoc(bufferReader)
 				if e != nil {
@@ -395,10 +395,10 @@ func WriteRequest(req RequestMsg, w io.Writer) error {
 		case t.Kind() == reflect.String:
 			_, e = bufWriter.WriteString(f.String())
 			bufWriter.WriteByte(0) //Terminate with \x00
-		case t == reflect.TypeOf((bson.M)(nil)):
-			e = writeBson(f.Interface().(bson.M), bufWriter)
-		case t == reflect.TypeOf(([]bson.M)(nil)):
-			data := f.Interface().([]bson.M)
+		case t == reflect.TypeOf((bson.D)(nil)):
+			e = writeBson(f.Interface().(bson.D), bufWriter)
+		case t == reflect.TypeOf(([]bson.D)(nil)):
+			data := f.Interface().([]bson.D)
 
 			for _, d := range data {
 				e = writeBson(d, bufWriter)
